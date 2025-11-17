@@ -6,7 +6,7 @@
 #include <chrono>
 #include <algorithm>
 #include <png.h>
-// =============== OpenCV для визуализации ===============
+// =============== OpenCV Г¤Г«Гї ГўГЁГ§ГіГ Г«ГЁГ§Г Г¶ГЁГЁ ===============
 #include <opencv2/opencv.hpp>
 
 // ======================
@@ -410,9 +410,9 @@ float execute_filter_on_cpu(const Image& input, Image& output, const std::string
     return std::chrono::duration<float, std::milli>(end_time - start_time).count();
 }
 
-// =============== Визуализация через OpenCV (безопасная для headless) ===============
+// =============== Г‚ГЁГ§ГіГ Г«ГЁГ§Г Г¶ГЁГї Г·ГҐГ°ГҐГ§ OpenCV (ГЎГҐГ§Г®ГЇГ Г±Г­Г Гї Г¤Г«Гї headless) ===============
 void show_results(const std::string& input_path) {
-    // Проверяем, доступен ли графический дисплей (через переменную окружения)
+    // ГЏГ°Г®ГўГҐГ°ГїГҐГ¬, Г¤Г®Г±ГІГіГЇГҐГ­ Г«ГЁ ГЈГ°Г ГґГЁГ·ГҐГ±ГЄГЁГ© Г¤ГЁГ±ГЇГ«ГҐГ© (Г·ГҐГ°ГҐГ§ ГЇГҐГ°ГҐГ¬ГҐГ­Г­ГіГѕ Г®ГЄГ°ГіГ¦ГҐГ­ГЁГї)
     const char* display = std::getenv("DISPLAY");
     if (!display) {
         std::cout << "\n[INFO] No display found. Skipping image visualization.\n";
@@ -423,7 +423,7 @@ void show_results(const std::string& input_path) {
         return;
     }
 
-    // Загружаем изображения через OpenCV
+    // Г‡Г ГЈГ°ГіГ¦Г ГҐГ¬ ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГї Г·ГҐГ°ГҐГ§ OpenCV
     cv::Mat original = cv::imread(input_path);
     cv::Mat blur     = cv::imread("output_blur.png");
     cv::Mat edge     = cv::imread("output_edge.png");
@@ -434,7 +434,7 @@ void show_results(const std::string& input_path) {
         return;
     }
 
-    // Показываем окна
+    // ГЏГ®ГЄГ Г§Г»ГўГ ГҐГ¬ Г®ГЄГ­Г 
     cv::imshow("Original", original);
     cv::imshow("Gaussian Blur", blur);
     cv::imshow("Sobel Edge", edge);
