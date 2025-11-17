@@ -3,7 +3,7 @@
 
 int main() {
     int deviceCount;
-    cudaGetDeviceCount(&deviceCount); // Получить количество CUDA-совместимых устройств
+    cudaGetDeviceCount(&deviceCount); // ГЏГ®Г«ГіГ·ГЁГІГј ГЄГ®Г«ГЁГ·ГҐГ±ГІГўГ® CUDA-Г±Г®ГўГ¬ГҐГ±ГІГЁГ¬Г»Гµ ГіГ±ГІГ°Г®Г©Г±ГІГў
 
     if (deviceCount == 0) {
         std::cerr << "No CUDA devices found." << std::endl;
@@ -11,8 +11,8 @@ int main() {
     }
 
     for (int i = 0; i < deviceCount; ++i) {
-        cudaDeviceProp prop; // Инициализация структуры cudaDeviceProp
-        cudaGetDeviceProperties(&prop, i); // Получить свойства для устройства 'i'
+        cudaDeviceProp prop; // Г€Г­ГЁГ¶ГЁГ Г«ГЁГ§Г Г¶ГЁГї Г±ГІГ°ГіГЄГІГіГ°Г» cudaDeviceProp
+        cudaGetDeviceProperties(&prop, i); // ГЏГ®Г«ГіГ·ГЁГІГј Г±ГўГ®Г©Г±ГІГўГ  Г¤Г«Гї ГіГ±ГІГ°Г®Г©Г±ГІГўГ  'i'
 
         std::cout << "--- Device Number: " << i << " ---" << std::endl;
         std::cout << "  Device Name: " << prop.name << std::endl;
@@ -24,8 +24,8 @@ int main() {
         std::cout << "  Multiprocessor Count: " << prop.multiProcessorCount << std::endl;
         std::cout << "  Clock Rate (kHz): " << prop.clockRate << std::endl;
         std::cout << "  Warp Size: " << prop.warpSize << std::endl;
-        std::cout << "  Registers Per Block: " << prop.regsPerBlock << std::endl; // Добавлено
-        std::cout << "  Memory Pitch (bytes): " << prop.memPitch << std::endl; // Добавлено
+        std::cout << "  Registers Per Block: " << prop.regsPerBlock << std::endl; // Г„Г®ГЎГ ГўГ«ГҐГ­Г®
+        std::cout << "  Memory Pitch (bytes): " << prop.memPitch << std::endl; // Г„Г®ГЎГ ГўГ«ГҐГ­Г®
         std::cout << "  ECC Enabled: " << (prop.ECCEnabled ? "Yes" : "No") << std::endl;
         std::cout << std::endl;
     }
