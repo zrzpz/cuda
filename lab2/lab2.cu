@@ -6,11 +6,11 @@
 #include <chrono>
 #include <algorithm>
 #include <png.h>
-// =============== OpenCV äëÿ âèçóàëèçàöèè ===============
+// OpenCV для визуализации результатов
 #include <opencv2/opencv.hpp>
 
 // ======================
-// Image structure
+// Структура изображения
 // ======================
 
 struct Image {
@@ -26,7 +26,7 @@ struct Image {
 };
 
 // ======================
-// Boundary handling (reflect padding)
+// Обработка границ изображения (отражение)
 // ======================
 
 __device__ __forceinline__ int reflect_index(int index, int limit) {
@@ -35,6 +35,7 @@ __device__ __forceinline__ int reflect_index(int index, int limit) {
     return index;
 }
 
+// Устройство: корректный индекс с отражением на границах
 __device__ __forceinline__ int clamp_reflect_index(int index, int limit) {
     if (limit <= 1) return 0;
     index = reflect_index(index, limit);
@@ -45,6 +46,7 @@ __device__ __forceinline__ int clamp_reflect_index(int index, int limit) {
     return index;
 }
 
+// То же самое, но для CPU
 inline int cpu_clamp_reflect_index(int index, int limit) {
     if (limit <= 1) return 0;
     auto reflect = [](int v, int lim) {
@@ -61,7 +63,7 @@ inline int cpu_clamp_reflect_index(int index, int limit) {
 }
 
 // ======================
-// Gaussian blur
+// Гауссово размытие
 // ======================
 
 __global__ void apply_gaussian_blur_kernel(
@@ -96,6 +98,7 @@ __global__ void apply_gaussian_blur_kernel(
     }
 }
 
+// CPU-версия гауссова размытия
 void apply_gaussian_blur_on_cpu(const Image& input, Image& output) {
     const float gaussian_weights[3][3] = {{1, 2, 1}, {2, 4, 2}, {1, 2, 1}};
     const float weight_sum = 16.0f;
@@ -122,7 +125,7 @@ void apply_gaussian_blur_on_cpu(const Image& input, Image& output) {
 }
 
 // ======================
-// Sobel edge detection
+// Обнаружение границ (оператор Собеля)
 // ======================
 
 __global__ void apply_sobel_edge_kernel(
@@ -160,6 +163,7 @@ __global__ void apply_sobel_edge_kernel(
     }
 }
 
+// CPU-версия оператора Собеля
 void apply_sobel_edge_on_cpu(const Image& input, Image& output) {
     const int sobel_x[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     const int sobel_y[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
@@ -189,9 +193,10 @@ void apply_sobel_edge_on_cpu(const Image& input, Image& output) {
 }
 
 // ======================
-// Median denoising
+// Медианный фильтр (для подавления шума)
 // ======================
 
+// Сортировка 9 значений (пузырьком, достаточно для малого массива)
 __device__ void sort_nine_values(unsigned char* values) {
     for (int i = 0; i < 8; ++i) {
         for (int j = 0; j < 8 - i; ++j) {
@@ -230,6 +235,7 @@ __global__ void apply_median_filter_kernel(
     }
 }
 
+// CPU-версия медианного фильтра
 void apply_median_filter_on_cpu(const Image& input, Image& output) {
     for (int y = 0; y < input.height; ++y) {
         for (int x = 0; x < input.width; ++x) {
@@ -251,7 +257,7 @@ void apply_median_filter_on_cpu(const Image& input, Image& output) {
 }
 
 // ======================
-// PNG I/O
+// Чтение и запись PNG
 // ======================
 
 bool load_png_image(const std::string& filename, Image& image) {
@@ -341,9 +347,10 @@ bool save_png_image(const std::string& filename, const Image& image) {
 }
 
 // ======================
-// Filter execution
+// Выполнение фильтров
 // ======================
 
+// Запуск фильтра на GPU и замер времени
 float execute_filter_on_gpu(const Image& input, Image& output, const std::string& filter_name) {
     size_t data_size = input.width * input.height * input.channel_count;
     unsigned char *device_input, *device_output;
@@ -394,6 +401,7 @@ float execute_filter_on_gpu(const Image& input, Image& output, const std::string
     return milliseconds;
 }
 
+// Запуск фильтра на CPU и замер времени
 float execute_filter_on_cpu(const Image& input, Image& output, const std::string& filter_name) {
     auto start_time = std::chrono::high_resolution_clock::now();
     output = Image(input.width, input.height, input.channel_count);
@@ -410,9 +418,12 @@ float execute_filter_on_cpu(const Image& input, Image& output, const std::string
     return std::chrono::duration<float, std::milli>(end_time - start_time).count();
 }
 
-// =============== Âèçóàëèçàöèÿ ÷åðåç OpenCV (áåçîïàñíàÿ äëÿ headless) ===============
+// ======================
+// Визуализация результатов через OpenCV (работает только при наличии дисплея)
+// ======================
+
 void show_results(const std::string& input_path) {
-    // Ïðîâåðÿåì, äîñòóïåí ëè ãðàôè÷åñêèé äèñïëåé (÷åðåç ïåðåìåííóþ îêðóæåíèÿ)
+    // Проверяем, доступен ли графический дисплей
     const char* display = std::getenv("DISPLAY");
     if (!display) {
         std::cout << "\n[INFO] No display found. Skipping image visualization.\n";
@@ -423,7 +434,7 @@ void show_results(const std::string& input_path) {
         return;
     }
 
-    // Çàãðóæàåì èçîáðàæåíèÿ ÷åðåç OpenCV
+    // Загружаем изображения через OpenCV
     cv::Mat original = cv::imread(input_path);
     cv::Mat blur     = cv::imread("output_blur.png");
     cv::Mat edge     = cv::imread("output_edge.png");
@@ -434,7 +445,7 @@ void show_results(const std::string& input_path) {
         return;
     }
 
-    // Ïîêàçûâàåì îêíà
+    // Отображаем результаты
     cv::imshow("Original", original);
     cv::imshow("Gaussian Blur", blur);
     cv::imshow("Sobel Edge", edge);
@@ -446,7 +457,7 @@ void show_results(const std::string& input_path) {
 }
 
 // ======================
-// Main program
+// Основная функция
 // ======================
 
 int main(int argc, char** argv) {
@@ -464,6 +475,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> filter_names = {"blur", "edge", "denoise"};
     std::vector<float> gpu_durations, cpu_durations;
 
+    // Применяем каждый фильтр на GPU и CPU, сохраняем результаты
     for (const std::string& filter : filter_names) {
         Image gpu_result, cpu_result;
         float gpu_time = execute_filter_on_gpu(source_image, gpu_result, filter);
@@ -473,7 +485,7 @@ int main(int argc, char** argv) {
         save_png_image("output_" + filter + ".png", gpu_result);
     }
 
-    // Pretty table output
+    // Вывод таблицы производительности
     std::cout << "\n=== FILTER PERFORMANCE (milliseconds) ===\n";
     std::cout << "+----------+----------+----------+----------+\n";
     std::cout << "| Filter   | GPU Time | CPU Time | Speedup  |\n";
