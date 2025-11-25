@@ -309,51 +309,55 @@ DualGPUContext init_dual_gpu(int image_height) {
 // ======================
 
 float execute_filter_on_gpu_dual(const Image& input, Image& output, const std::string& filter_name) {
+    // Инициализация контекста для двух GPU: разбиение изображения по высоте с перекрытием
     DualGPUContext ctx = init_dual_gpu(input.height);
 
     size_t total_size = input.width * input.height * input.channel_count;
     output = Image(input.width, input.height, input.channel_count);
 
+    // Вычисление размеров частей изображения с учётом перекрытия
     size_t height0 = ctx.split_height + ctx.overlap;
     size_t size0 = input.width * height0 * input.channel_count;
-
     size_t height1 = input.height - ctx.split_height + ctx.overlap;
     size_t size1 = input.width * height1 * input.channel_count;
 
     const unsigned char* h_input = input.pixel_data.data();
     unsigned char* h_output = output.pixel_data.data();
 
+    // Регистрация хостовой памяти для ускоренного копирования (pinned memory)
     CUDA_CHECK(cudaHostRegister(const_cast<unsigned char*>(h_input), total_size, cudaHostRegisterReadOnly));
     CUDA_CHECK(cudaHostRegister(h_output, total_size, cudaHostRegisterDefault));
 
-    unsigned char *d_in0, *d_out0, *d_in1, *d_out1;
+    // Указатели на видеопамять для двух GPU
+    unsigned char *d_in0 = nullptr, *d_out0 = nullptr, *d_in1 = nullptr, *d_out1 = nullptr;
 
-    // GPU 0
+    // === Выделение видеопамяти на GPU0 ===
     CUDA_CHECK(cudaSetDevice(ctx.gpu0));
     CUDA_CHECK(cudaMalloc(&d_in0, size0));
     CUDA_CHECK(cudaMalloc(&d_out0, size0));
 
-    // GPU 1
+    // === Выделение видеопамяти на GPU1 ===
     CUDA_CHECK(cudaSetDevice(ctx.gpu1));
     CUDA_CHECK(cudaMalloc(&d_in1, size1));
     CUDA_CHECK(cudaMalloc(&d_out1, size1));
 
-    // Copy input
+    // === Копирование данных на устройства ===
+    // Верхняя часть (включая перекрытие) — на GPU0
     CUDA_CHECK(cudaMemcpy(d_in0, h_input, size0, cudaMemcpyHostToDevice));
+
+    // Нижняя часть: начинается за (split_height - overlap) строк до границы
     const unsigned char* h_in1 = h_input + (ctx.split_height - ctx.overlap) * input.width * input.channel_count;
+    CUDA_CHECK(cudaSetDevice(ctx.gpu1));
     CUDA_CHECK(cudaMemcpy(d_in1, h_in1, size1, cudaMemcpyHostToDevice));
 
-    // Grid setup
+    // Настройка размеров блоков и сеток для каждого GPU
     dim3 block(16, 16);
     dim3 grid0((input.width + block.x - 1) / block.x, (height0 + block.y - 1) / block.y);
     dim3 grid1((input.width + block.x - 1) / block.x, (height1 + block.y - 1) / block.y);
 
-    cudaEvent_t start, stop;
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-    CUDA_CHECK(cudaEventRecord(start));
-
-    // Launch kernels
+    // ========================
+    // ПРОГРЕВ: запуск ядер на обоих GPU параллельно
+    // ========================
     CUDA_CHECK(cudaSetDevice(ctx.gpu0));
     if (filter_name == "blur") {
         apply_gaussian_blur_kernel<<<grid0, block>>>(d_in0, d_out0, input.width, height0, input.channel_count);
@@ -362,7 +366,6 @@ float execute_filter_on_gpu_dual(const Image& input, Image& output, const std::s
     } else if (filter_name == "denoise") {
         apply_median_filter_kernel<<<grid0, block>>>(d_in0, d_out0, input.width, height0, input.channel_count);
     }
-    CUDA_CHECK(cudaGetLastError());
 
     CUDA_CHECK(cudaSetDevice(ctx.gpu1));
     if (filter_name == "blur") {
@@ -372,31 +375,85 @@ float execute_filter_on_gpu_dual(const Image& input, Image& output, const std::s
     } else if (filter_name == "denoise") {
         apply_median_filter_kernel<<<grid1, block>>>(d_in1, d_out1, input.width, height1, input.channel_count);
     }
-    CUDA_CHECK(cudaGetLastError());
 
-    // Synchronize and time
+    // Ядра запущены асинхронно — ожидаем завершения на всех устройствах
     CUDA_CHECK(cudaDeviceSynchronize());
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    float ms;
-    CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
 
-    // Copy back
-    CUDA_CHECK(cudaMemcpy(h_output, d_out0, ctx.split_height * input.width * input.channel_count, cudaMemcpyDeviceToHost));
+    // ========================
+    // ФАКТИЧЕСКОЕ ИЗМЕРЕНИЕ ВРЕМЕНИ ВЫПОЛНЕНИЯ ЯДЕР
+    // ========================
+    cudaEvent_t start0, stop0, start1, stop1;
+    float gpu0_ms = 0.0f, gpu1_ms = 0.0f;
 
+    // --- Запуск и измерение времени на GPU0 ---
+    CUDA_CHECK(cudaSetDevice(ctx.gpu0));
+    CUDA_CHECK(cudaEventCreate(&start0));
+    CUDA_CHECK(cudaEventCreate(&stop0));
+    CUDA_CHECK(cudaEventRecord(start0));
+
+    if (filter_name == "blur") {
+        apply_gaussian_blur_kernel<<<grid0, block>>>(d_in0, d_out0, input.width, height0, input.channel_count);
+    } else if (filter_name == "edge") {
+        apply_sobel_edge_kernel<<<grid0, block>>>(d_in0, d_out0, input.width, height0, input.channel_count);
+    } else if (filter_name == "denoise") {
+        apply_median_filter_kernel<<<grid0, block>>>(d_in0, d_out0, input.width, height0, input.channel_count);
+    }
+    CUDA_CHECK(cudaEventRecord(stop0));
+
+    // --- Запуск и измерение времени на GPU1 (сразу после GPU0 для минимизации задержек) ---
+    CUDA_CHECK(cudaSetDevice(ctx.gpu1));
+    CUDA_CHECK(cudaEventCreate(&start1));
+    CUDA_CHECK(cudaEventCreate(&stop1));
+    CUDA_CHECK(cudaEventRecord(start1));
+
+    if (filter_name == "blur") {
+        apply_gaussian_blur_kernel<<<grid1, block>>>(d_in1, d_out1, input.width, height1, input.channel_count);
+    } else if (filter_name == "edge") {
+        apply_sobel_edge_kernel<<<grid1, block>>>(d_in1, d_out1, input.width, height1, input.channel_count);
+    } else if (filter_name == "denoise") {
+        apply_median_filter_kernel<<<grid1, block>>>(d_in1, d_out1, input.width, height1, input.channel_count);
+    }
+    CUDA_CHECK(cudaEventRecord(stop1));
+
+    // Ожидание завершения всех операций на обоих GPU
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    // Получение времени выполнения для каждого GPU
+    CUDA_CHECK(cudaEventElapsedTime(&gpu0_ms, start0, stop0));
+    CUDA_CHECK(cudaEventElapsedTime(&gpu1_ms, start1, stop1));
+
+    // Общее время — максимальное из двух, так как GPU работают параллельно
+    float kernel_time = fmaxf(gpu0_ms, gpu1_ms);
+
+    // ========================
+    // СБОРКА РЕЗУЛЬТАТА: копирование частей обратно в хостовую память
+    // ========================
+    // Верхняя часть (без перекрытия) — напрямую из GPU0
+    CUDA_CHECK(cudaMemcpy(
+        h_output,
+        d_out0,
+        ctx.split_height * input.width * input.channel_count,
+        cudaMemcpyDeviceToHost
+    ));
+
+    // Нижняя часть: пропускаем перекрывающиеся строки из результата GPU1
     unsigned char* h_out1 = h_output + ctx.split_height * input.width * input.channel_count;
     const unsigned char* d_out1_skip = d_out1 + ctx.overlap * input.width * input.channel_count;
     size_t out1_size = (input.height - ctx.split_height) * input.width * input.channel_count;
     CUDA_CHECK(cudaMemcpy(h_out1, d_out1_skip, out1_size, cudaMemcpyDeviceToHost));
 
-    // Cleanup
+    // ========================
+    // ОСВОБОЖДЕНИЕ РЕСУРСОВ
+    // ========================
     CUDA_CHECK(cudaFree(d_in0)); CUDA_CHECK(cudaFree(d_out0));
     CUDA_CHECK(cudaFree(d_in1)); CUDA_CHECK(cudaFree(d_out1));
-    CUDA_CHECK(cudaEventDestroy(start)); CUDA_CHECK(cudaEventDestroy(stop));
+    CUDA_CHECK(cudaEventDestroy(start0)); CUDA_CHECK(cudaEventDestroy(stop0));
+    CUDA_CHECK(cudaEventDestroy(start1)); CUDA_CHECK(cudaEventDestroy(stop1));
     CUDA_CHECK(cudaHostUnregister(const_cast<unsigned char*>(h_input)));
     CUDA_CHECK(cudaHostUnregister(h_output));
 
-    return ms;
+    // Возвращаем время самого медленного GPU — это и есть реальное время обработки
+    return kernel_time;
 }
 
 // ======================
