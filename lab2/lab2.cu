@@ -364,6 +364,25 @@ float execute_filter_on_gpu(const Image& input, Image& output, const std::string
         (input.height + block_size.y - 1) / block_size.y
     );
 
+    // === WARM-UP (прогрев) ===
+    // Выполняем один прогон ядра, чтобы исключить накладные расходы
+    // (инициализация, кэширование и т.д.) из измерения времени
+    if (filter_name == "blur") {
+        apply_gaussian_blur_kernel<<<grid_size, block_size>>>(
+            device_input, device_output, input.width, input.height, input.channel_count
+        );
+    } else if (filter_name == "edge") {
+        apply_sobel_edge_kernel<<<grid_size, block_size>>>(
+            device_input, device_output, input.width, input.height, input.channel_count
+        );
+    } else if (filter_name == "denoise") {
+        apply_median_filter_kernel<<<grid_size, block_size>>>(
+            device_input, device_output, input.width, input.height, input.channel_count
+        );
+    }
+    cudaDeviceSynchronize(); // Ждём завершения прогревочного запуска
+
+    // === ACTUAL TIMING (фактическое измерение времени) ===
     cudaEvent_t start_event, stop_event;
     cudaEventCreate(&start_event);
     cudaEventCreate(&stop_event);
