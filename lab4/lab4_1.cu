@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Помощник для проверки ошибок CUDA
+// РґР»СЏ РїСЂРѕРІРµСЂРєРё РѕС€РёР±РѕРє CUDA
 #define CUDA_CHECK(call) \
     do { \
         cudaError_t err = call; \
@@ -13,7 +13,7 @@
         } \
     } while (0)
 
-// Ядро: заполняет матрицу значениями на GPU
+// РЇРґСЂРѕ: Р·Р°РїРѕР»РЅСЏРµС‚ РјР°С‚СЂРёС†Сѓ Р·РЅР°С‡РµРЅРёСЏРјРё РЅР° GPU
 __global__ void createMatrix(int *A, const int n)
 {
     A[threadIdx.y * n + threadIdx.x] = 10 * threadIdx.y + threadIdx.x;
@@ -24,54 +24,54 @@ int main()
     const int n = 10;
     size_t size = n * n * sizeof(int);
 
-    // Выделяем память для матрицы на CPU
+    // Р’С‹РґРµР»СЏРµРј РїР°РјСЏС‚СЊ РґР»СЏ РјР°С‚СЂРёС†С‹ РЅР° CPU
     int *h_A = (int *)malloc(size);
     if (!h_A) {
         fprintf(stderr, "Error: malloc failed for h_A\n");
         return EXIT_FAILURE;
     }
 
-    // Инициализируем матрицу A на CPU
+    // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РјР°С‚СЂРёС†Сѓ A РЅР° CPU
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             h_A[j * n + i] = 10 * j + i;
         }
     }
 
-    // Указатель на память GPU
+    // РЈРєР°Р·Р°С‚РµР»СЊ РЅР° РїР°РјСЏС‚СЊ GPU
     int *d_B = NULL;
 
-    // Выделяем память на GPU
+    // Р’С‹РґРµР»СЏРµРј РїР°РјСЏС‚СЊ РЅР° GPU
     CUDA_CHECK(cudaMalloc((void **)&d_B, size));
 
-    // Определение размеров блока и сетки
+    // РћРїСЂРµРґРµР»РµРЅРёРµ СЂР°Р·РјРµСЂРѕРІ Р±Р»РѕРєР° Рё СЃРµС‚РєРё
     dim3 threadsPerBlock(10, 10);
     dim3 blocksPerGrid(1, 1, 1);
 
-    // Создание событий для замера времени
+    // РЎРѕР·РґР°РЅРёРµ СЃРѕР±С‹С‚РёР№ РґР»СЏ Р·Р°РјРµСЂР° РІСЂРµРјРµРЅРё
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    // Запуск замера и выполнение ядра
+    // Р—Р°РїСѓСЃРє Р·Р°РјРµСЂР° Рё РІС‹РїРѕР»РЅРµРЅРёРµ СЏРґСЂР°
     CUDA_CHECK(cudaEventRecord(start, 0));
     createMatrix<<<blocksPerGrid, threadsPerBlock>>>(d_B, n);
 
-    // Проверка на ошибки при запуске ядра (асинхронная ошибка!)
+    // РџСЂРѕРІРµСЂРєР° РЅР° РѕС€РёР±РєРё РїСЂРё Р·Р°РїСѓСЃРєРµ СЏРґСЂР° (Р°СЃРёРЅС…СЂРѕРЅРЅР°СЏ РѕС€РёР±РєР°!)
     CUDA_CHECK(cudaGetLastError());
 
     CUDA_CHECK(cudaEventRecord(stop, 0));
     CUDA_CHECK(cudaEventSynchronize(stop));
 
-    // Получаем время выполнения ядра
+    // РџРѕР»СѓС‡Р°РµРј РІСЂРµРјСЏ РІС‹РїРѕР»РЅРµРЅРёСЏ СЏРґСЂР°
     float kernelTimeMs;
     CUDA_CHECK(cudaEventElapsedTime(&kernelTimeMs, start, stop));
 
-    // Освобождаем события
+    // РћСЃРІРѕР±РѕР¶РґР°РµРј СЃРѕР±С‹С‚РёСЏ
     CUDA_CHECK(cudaEventDestroy(start));
     CUDA_CHECK(cudaEventDestroy(stop));
 
-    // Выделяем память для результата на CPU
+    // Р’С‹РґРµР»СЏРµРј РїР°РјСЏС‚СЊ РґР»СЏ СЂРµР·СѓР»СЊС‚Р°С‚Р° РЅР° CPU
     int *h_B = (int *)malloc(size);
     if (!h_B) {
         fprintf(stderr, "Error: malloc failed for h_B\n");
@@ -80,10 +80,10 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Копируем данные с GPU на CPU
+    // РљРѕРїРёСЂСѓРµРј РґР°РЅРЅС‹Рµ СЃ GPU РЅР° CPU
     CUDA_CHECK(cudaMemcpy(h_B, d_B, size, cudaMemcpyDeviceToHost));
 
-    // Проверяем совпадение
+    // РџСЂРѕРІРµСЂСЏРµРј СЃРѕРІРїР°РґРµРЅРёРµ
     bool match = true;
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
@@ -101,7 +101,7 @@ int main()
 
     printf("Kernel execution time: %.6f ms\n", kernelTimeMs);
 
-    // Освобождение памяти
+    // РћСЃРІРѕР±РѕР¶РґРµРЅРёРµ РїР°РјСЏС‚Рё
     CUDA_CHECK(cudaFree(d_B));
     free(h_A);
     free(h_B);
