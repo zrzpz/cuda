@@ -2,19 +2,19 @@
 #include "device_launch_parameters.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>  // для fabs()
+#include <math.h>  // РґР»СЏ fabs()
 
 #define BLOCK_SIZE 16
-// Тип, который будут иметь элементы матриц
+// РўРёРї, РєРѕС‚РѕСЂС‹Р№ Р±СѓРґСѓС‚ РёРјРµС‚СЊ СЌР»РµРјРµРЅС‚С‹ РјР°С‚СЂРёС†
 #define BASE_TYPE double
 
-// Функция перемножения матриц
+// Р¤СѓРЅРєС†РёСЏ РїРµСЂРµРјРЅРѕР¶РµРЅРёСЏ РјР°С‚СЂРёС†
 __global__ void matrixMult(const BASE_TYPE *A, const BASE_TYPE *B, BASE_TYPE *C,
                            int Acols, int Bcols) {
-    int i = blockDim.y * blockIdx.y + threadIdx.y;  // строка в матрице C (и A)
-    int j = blockDim.x * blockIdx.x + threadIdx.x;  // столбец в матрице C (и B)
+    int i = blockDim.y * blockIdx.y + threadIdx.y;  // СЃС‚СЂРѕРєР° РІ РјР°С‚СЂРёС†Рµ C (Рё A)
+    int j = blockDim.x * blockIdx.x + threadIdx.x;  // СЃС‚РѕР»Р±РµС† РІ РјР°С‚СЂРёС†Рµ C (Рё B)
 
-    // Проверка выхода за пределы (важно, если размеры не кратны BLOCK_SIZE)
+    // РџСЂРѕРІРµСЂРєР° РІС‹С…РѕРґР° Р·Р° РїСЂРµРґРµР»С‹ (РІР°Р¶РЅРѕ, РµСЃР»Рё СЂР°Р·РјРµСЂС‹ РЅРµ РєСЂР°С‚РЅС‹ BLOCK_SIZE)
     if (i >= gridDim.y * blockDim.y || j >= gridDim.x * blockDim.x) {
         return;
     }
@@ -27,7 +27,7 @@ __global__ void matrixMult(const BASE_TYPE *A, const BASE_TYPE *B, BASE_TYPE *C,
     C[i * Bcols + j] = sum;
 }
 
-// Округление вверх до кратного BLOCK_SIZE
+// РћРєСЂСѓРіР»РµРЅРёРµ РІРІРµСЂС… РґРѕ РєСЂР°С‚РЅРѕРіРѕ BLOCK_SIZE
 int toMultiple(int a, int b) {
     int mod = a % b;
     if (mod != 0) {
@@ -37,18 +37,18 @@ int toMultiple(int a, int b) {
 }
 
 int main() {
-    // События для замера времени выполнения ядра
+    // РЎРѕР±С‹С‚РёСЏ РґР»СЏ Р·Р°РјРµСЂР° РІСЂРµРјРµРЅРё РІС‹РїРѕР»РЅРµРЅРёСЏ СЏРґСЂР°
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    // Исходные размеры матриц
-    int Arows = 1000;
-    int Acols = 1500;
+    // РСЃС…РѕРґРЅС‹Рµ СЂР°Р·РјРµСЂС‹ РјР°С‚СЂРёС†
+    int Arows = 100;
+    int Acols = 200;
     int Brows = Acols;  
-    int Bcols = 1200;
+    int Bcols = 150;
 
-    // Приведение к кратности BLOCK_SIZE
+    // РџСЂРёРІРµРґРµРЅРёРµ Рє РєСЂР°С‚РЅРѕСЃС‚Рё BLOCK_SIZE
     Arows = toMultiple(Arows, BLOCK_SIZE);
     printf("Arows = %d\n", Arows);
 
@@ -65,12 +65,12 @@ int main() {
     size_t Bsize = Brows * Bcols * sizeof(BASE_TYPE);
     size_t Csize = Arows * Bcols * sizeof(BASE_TYPE);
 
-    // Выделение памяти на хосте
+    // Р’С‹РґРµР»РµРЅРёРµ РїР°РјСЏС‚Рё РЅР° С…РѕСЃС‚Рµ
     BASE_TYPE *h_A = (BASE_TYPE *)malloc(Asize);
     BASE_TYPE *h_B = (BASE_TYPE *)malloc(Bsize);
     BASE_TYPE *h_C = (BASE_TYPE *)malloc(Csize);
 
-    // Инициализация матриц случайными значениями [0, 1)
+    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РјР°С‚СЂРёС† СЃР»СѓС‡Р°Р№РЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё [0, 1)
     for (int i = 0; i < Arows * Acols; ++i) {
         h_A[i] = rand() / (BASE_TYPE)RAND_MAX;
     }
@@ -78,7 +78,7 @@ int main() {
         h_B[i] = rand() / (BASE_TYPE)RAND_MAX;
     }
 
-    // Выделение и копирование данных на устройство
+    // Р’С‹РґРµР»РµРЅРёРµ Рё РєРѕРїРёСЂРѕРІР°РЅРёРµ РґР°РЅРЅС‹С… РЅР° СѓСЃС‚СЂРѕР№СЃС‚РІРѕ
     BASE_TYPE *d_A = nullptr;
     cudaMalloc((void **)&d_A, Asize);
 
@@ -91,11 +91,11 @@ int main() {
     cudaMemcpy(d_A, h_A, Asize, cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, h_B, Bsize, cudaMemcpyHostToDevice);
 
-    // Конфигурация запуска ядра
+    // РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ Р·Р°РїСѓСЃРєР° СЏРґСЂР°
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 blocksPerGrid(Bcols / BLOCK_SIZE, Arows / BLOCK_SIZE);
 
-    // Запуск ядра и замер времени
+    // Р—Р°РїСѓСЃРє СЏРґСЂР° Рё Р·Р°РјРµСЂ РІСЂРµРјРµРЅРё
     cudaEventRecord(start, 0);
     matrixMult<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, Acols, Bcols);
     cudaEventRecord(stop, 0);
@@ -105,10 +105,10 @@ int main() {
     cudaEventElapsedTime(&KernelTime, start, stop);
     printf("KernelTime: %.2f milliseconds\n", KernelTime);
 
-    // Копирование результата обратно на хост
+    // РљРѕРїРёСЂРѕРІР°РЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚Р° РѕР±СЂР°С‚РЅРѕ РЅР° С…РѕСЃС‚
     cudaMemcpy(h_C, d_C, Csize, cudaMemcpyDeviceToHost);
 
-    // Проверка корректности результата
+    // РџСЂРѕРІРµСЂРєР° РєРѕСЂСЂРµРєС‚РЅРѕСЃС‚Рё СЂРµР·СѓР»СЊС‚Р°С‚Р°
     printf("Test STARTED\n");
     bool passed = true;
     for (int i = 0; i < Arows; ++i) {
@@ -123,7 +123,7 @@ int main() {
                                 "diff = %.6f (expected %.6f, got %.6f)\n",
                         i, j, diff, sum, h_C[i * Bcols + j]);
                 passed = false;
-                // Не выходим сразу — можно оставить для полного лога или выйти сразу:
+                // РќРµ РІС‹С…РѕРґРёРј СЃСЂР°Р·Сѓ вЂ” РјРѕР¶РЅРѕ РѕСЃС‚Р°РІРёС‚СЊ РґР»СЏ РїРѕР»РЅРѕРіРѕ Р»РѕРіР° РёР»Рё РІС‹Р№С‚Рё СЃСЂР°Р·Сѓ:
                 // exit(EXIT_FAILURE);
             }
         }
@@ -136,7 +136,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Очистка ресурсов
+    // РћС‡РёСЃС‚РєР° СЂРµСЃСѓСЂСЃРѕРІ
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
