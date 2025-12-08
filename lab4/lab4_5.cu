@@ -7,7 +7,7 @@
 #define BLOCK_SIZE 16
 #define BASE_TYPE double
 
-// Функция вычисления числа, которое больше числа a и кратное числу b
+// Р¤СѓРЅРєС†РёСЏ РІС‹С‡РёСЃР»РµРЅРёСЏ С‡РёСЃР»Р°, РєРѕС‚РѕСЂРѕРµ Р±РѕР»СЊС€Рµ С‡РёСЃР»Р° a Рё РєСЂР°С‚РЅРѕРµ С‡РёСЃР»Сѓ b
 int toMultiple(int a, int b) {
     int mod = a % b;
     if (mod != 0) {
@@ -17,65 +17,65 @@ int toMultiple(int a, int b) {
     return a;
 }
 
-// Ядро: оптимизированное умножение матриц с использованием разделяемой памяти
+// РЇРґСЂРѕ: РѕРїС‚РёРјРёР·РёСЂРѕРІР°РЅРЅРѕРµ СѓРјРЅРѕР¶РµРЅРёРµ РјР°С‚СЂРёС† СЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј СЂР°Р·РґРµР»СЏРµРјРѕР№ РїР°РјСЏС‚Рё
 __global__ void matrixMult(const BASE_TYPE* A, const BASE_TYPE* B, 
                            BASE_TYPE* C, int Acols, int Bcols) {
-    // Индекс начала первой подматрицы A, которую обрабатывает блок
+    // РРЅРґРµРєСЃ РЅР°С‡Р°Р»Р° РїРµСЂРІРѕР№ РїРѕРґРјР°С‚СЂРёС†С‹ A, РєРѕС‚РѕСЂСѓСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚ Р±Р»РѕРє
     int aBegin = Acols * BLOCK_SIZE * blockIdx.y;
-    // Индекс конца подматрицы A, которую обрабатывает блок
+    // РРЅРґРµРєСЃ РєРѕРЅС†Р° РїРѕРґРјР°С‚СЂРёС†С‹ A, РєРѕС‚РѕСЂСѓСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚ Р±Р»РѕРє
     int aEnd = aBegin + Acols - 1;
-    // Шаг для перебора подматриц A
+    // РЁР°Рі РґР»СЏ РїРµСЂРµР±РѕСЂР° РїРѕРґРјР°С‚СЂРёС† A
     int aStep = BLOCK_SIZE;
     
-    // Индекс начала первой подматрицы B, которую обрабатывает блок
+    // РРЅРґРµРєСЃ РЅР°С‡Р°Р»Р° РїРµСЂРІРѕР№ РїРѕРґРјР°С‚СЂРёС†С‹ B, РєРѕС‚РѕСЂСѓСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚ Р±Р»РѕРє
     int bBegin = BLOCK_SIZE * blockIdx.x;
-    // Шаг для перебора подматриц B
+    // РЁР°Рі РґР»СЏ РїРµСЂРµР±РѕСЂР° РїРѕРґРјР°С‚СЂРёС† B
     int bStep = BLOCK_SIZE * Bcols;
     
-    // Выделение разделяемой памяти для подматриц
+    // Р’С‹РґРµР»РµРЅРёРµ СЂР°Р·РґРµР»СЏРµРјРѕР№ РїР°РјСЏС‚Рё РґР»СЏ РїРѕРґРјР°С‚СЂРёС†
     __shared__ BASE_TYPE as[BLOCK_SIZE][BLOCK_SIZE];
     __shared__ BASE_TYPE bs[BLOCK_SIZE][BLOCK_SIZE];
     
-    // Переменная для вычисления элемента подматрицы
+    // РџРµСЂРµРјРµРЅРЅР°СЏ РґР»СЏ РІС‹С‡РёСЃР»РµРЅРёСЏ СЌР»РµРјРµРЅС‚Р° РїРѕРґРјР°С‚СЂРёС†С‹
     BASE_TYPE sum = 0.0;
     
-    // Проход по всем тайлам (подматрицам)
+    // РџСЂРѕС…РѕРґ РїРѕ РІСЃРµРј С‚Р°Р№Р»Р°Рј (РїРѕРґРјР°С‚СЂРёС†Р°Рј)
     for (int ia = aBegin, ib = bBegin; ia <= aEnd; ia += aStep, ib += bStep) {
-        // Загрузка подматриц A и B из глобальной памяти в разделяемую
+        // Р—Р°РіСЂСѓР·РєР° РїРѕРґРјР°С‚СЂРёС† A Рё B РёР· РіР»РѕР±Р°Р»СЊРЅРѕР№ РїР°РјСЏС‚Рё РІ СЂР°Р·РґРµР»СЏРµРјСѓСЋ
         as[threadIdx.y][threadIdx.x] = A[ia + Acols * threadIdx.y + threadIdx.x];
         bs[threadIdx.y][threadIdx.x] = B[ib + Bcols * threadIdx.y + threadIdx.x];
         
-        // Синхронизация нитей
+        // РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РЅРёС‚РµР№
         __syncthreads();
         
-        // Перемножение двух подматриц
+        // РџРµСЂРµРјРЅРѕР¶РµРЅРёРµ РґРІСѓС… РїРѕРґРјР°С‚СЂРёС†
         for (int k = 0; k < BLOCK_SIZE; k++) {
             sum += as[threadIdx.y][k] * bs[k][threadIdx.x];
         }
         
-        // Синхронизация нитей перед загрузкой следующих тайлов
+        // РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РЅРёС‚РµР№ РїРµСЂРµРґ Р·Р°РіСЂСѓР·РєРѕР№ СЃР»РµРґСѓСЋС‰РёС… С‚Р°Р№Р»РѕРІ
         __syncthreads();
     }
     
-    // Индекс результирующего элемента в глобальной памяти
+    // РРЅРґРµРєСЃ СЂРµР·СѓР»СЊС‚РёСЂСѓСЋС‰РµРіРѕ СЌР»РµРјРµРЅС‚Р° РІ РіР»РѕР±Р°Р»СЊРЅРѕР№ РїР°РјСЏС‚Рё
     int ind = Bcols * (BLOCK_SIZE * blockIdx.y + threadIdx.y) + 
               BLOCK_SIZE * blockIdx.x + threadIdx.x;
     
-    // Запись результата в глобальную память
+    // Р—Р°РїРёСЃСЊ СЂРµР·СѓР»СЊС‚Р°С‚Р° РІ РіР»РѕР±Р°Р»СЊРЅСѓСЋ РїР°РјСЏС‚СЊ
     C[ind] = sum;
 }
 
 int main() {
-    // Объекты событий для замера времени
+    // РћР±СЉРµРєС‚С‹ СЃРѕР±С‹С‚РёР№ РґР»СЏ Р·Р°РјРµСЂР° РІСЂРµРјРµРЅРё
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     
-    // Количество строк и столбцов матриц
-    int Arows = 1000, Acols = 1500;
-    int Brows = Acols, Bcols = 1200;
+    // РљРѕР»РёС‡РµСЃС‚РІРѕ СЃС‚СЂРѕРє Рё СЃС‚РѕР»Р±С†РѕРІ РјР°С‚СЂРёС†
+    int Arows = 100, Acols = 200;
+    int Brows = Acols, Bcols = 150;
     
-    // Приведение размеров кратными BLOCK_SIZE
+    // РџСЂРёРІРµРґРµРЅРёРµ СЂР°Р·РјРµСЂРѕРІ РєСЂР°С‚РЅС‹РјРё BLOCK_SIZE
     Arows = toMultiple(Arows, BLOCK_SIZE);
     Acols = toMultiple(Acols, BLOCK_SIZE);
     Brows = toMultiple(Brows, BLOCK_SIZE);
@@ -84,17 +84,17 @@ int main() {
     printf("Matrix multiplication: A(%d,%d) * B(%d,%d) = C(%d,%d)\n", 
            Arows, Acols, Brows, Bcols, Arows, Bcols);
     
-    // Размеры в байтах
+    // Р Р°Р·РјРµСЂС‹ РІ Р±Р°Р№С‚Р°С…
     size_t Asize = Arows * Acols * sizeof(BASE_TYPE);
     size_t Bsize = Brows * Bcols * sizeof(BASE_TYPE);
     size_t Csize = Arows * Bcols * sizeof(BASE_TYPE);
     
-    // Выделение памяти на хосте
+    // Р’С‹РґРµР»РµРЅРёРµ РїР°РјСЏС‚Рё РЅР° С…РѕСЃС‚Рµ
     BASE_TYPE* h_A = (BASE_TYPE*)malloc(Asize);
     BASE_TYPE* h_B = (BASE_TYPE*)malloc(Bsize);
     BASE_TYPE* h_C = (BASE_TYPE*)malloc(Csize);
     
-    // Инициализация матриц случайными числами
+    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РјР°С‚СЂРёС† СЃР»СѓС‡Р°Р№РЅС‹РјРё С‡РёСЃР»Р°РјРё
     for (int i = 0; i < Arows * Acols; ++i) {
         h_A[i] = rand() / (BASE_TYPE)RAND_MAX;
     }
@@ -102,7 +102,7 @@ int main() {
         h_B[i] = rand() / (BASE_TYPE)RAND_MAX;
     }
     
-    // Выделение памяти на девайсе
+    // Р’С‹РґРµР»РµРЅРёРµ РїР°РјСЏС‚Рё РЅР° РґРµРІР°Р№СЃРµ
     BASE_TYPE* d_A = NULL;
     BASE_TYPE* d_B = NULL;
     BASE_TYPE* d_C = NULL;
@@ -110,15 +110,15 @@ int main() {
     cudaMalloc((void**)&d_B, Bsize);
     cudaMalloc((void**)&d_C, Csize);
     
-    // Копирование данных с CPU на GPU
+    // РљРѕРїРёСЂРѕРІР°РЅРёРµ РґР°РЅРЅС‹С… СЃ CPU РЅР° GPU
     cudaMemcpy(d_A, h_A, Asize, cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, h_B, Bsize, cudaMemcpyHostToDevice);
     
-    // Определение размеров сетки и блоков
+    // РћРїСЂРµРґРµР»РµРЅРёРµ СЂР°Р·РјРµСЂРѕРІ СЃРµС‚РєРё Рё Р±Р»РѕРєРѕРІ
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     dim3 blocksPerGrid(Bcols / BLOCK_SIZE, Arows / BLOCK_SIZE);
     
-    // Запуск ядра и замер времени
+    // Р—Р°РїСѓСЃРє СЏРґСЂР° Рё Р·Р°РјРµСЂ РІСЂРµРјРµРЅРё
     cudaEventRecord(start, 0);
     matrixMult<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, Acols, Bcols);
     cudaEventRecord(stop, 0);
@@ -128,10 +128,10 @@ int main() {
     cudaEventElapsedTime(&KernelTime, start, stop);
     printf("KernelTime: %.2f milliseconds\n", KernelTime);
     
-    // Копирование результата обратно на CPU
+    // РљРѕРїРёСЂРѕРІР°РЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚Р° РѕР±СЂР°С‚РЅРѕ РЅР° CPU
     cudaMemcpy(h_C, d_C, Csize, cudaMemcpyDeviceToHost);
     
-    // Проверка правильности работы ядра (только первые 10?10 элементов)
+    // РџСЂРѕРІРµСЂРєР° РїСЂР°РІРёР»СЊРЅРѕСЃС‚Рё СЂР°Р±РѕС‚С‹ СЏРґСЂР° (С‚РѕР»СЊРєРѕ РїРµСЂРІС‹Рµ 10?10 СЌР»РµРјРµРЅС‚РѕРІ)
     printf("Validation in progress...\n");
     bool success = true;
     for (int i = 0; i < Arows && i < 10; i++) {
@@ -151,7 +151,7 @@ int main() {
     
     printf("Test %s\n", success ? "PASSED" : "FAILED");
     
-    // Освобождение памяти
+    // РћСЃРІРѕР±РѕР¶РґРµРЅРёРµ РїР°РјСЏС‚Рё
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
@@ -159,7 +159,7 @@ int main() {
     free(h_B);
     free(h_C);
     
-    // Удаление объектов событий
+    // РЈРґР°Р»РµРЅРёРµ РѕР±СЉРµРєС‚РѕРІ СЃРѕР±С‹С‚РёР№
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
     
